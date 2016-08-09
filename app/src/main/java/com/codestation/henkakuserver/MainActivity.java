@@ -101,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
                     throw new Exception();
                 }
 
-                henkakuServer = new HenkakuServer(this, port);
+                henkakuServer = new HenkakuServer(this, port, true);
                 henkakuServer.setIpAddress(getIpAccess(false));
                 henkakuServer.start();
                 return true;

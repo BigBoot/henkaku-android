@@ -24,13 +24,16 @@ import android.util.Pair;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,11 +50,19 @@ public class HenkakuServer extends NanoHTTPD {
 
     private String lastIpAddress;
     private String currentIpAddress;
+    private int port;
+    private boolean patchInstallButton;
     private byte[] stage1;
     private byte[] stage2;
 
     public HenkakuServer(Context ctx, int port) {
+        this(ctx, port, false);
+    }
+
+    public HenkakuServer(Context ctx, int port, boolean patchInstallButton) {
         super(port);
+        this.port = port;
+        this.patchInstallButton = patchInstallButton;
         context = ctx;
     }
 
@@ -367,12 +378,30 @@ public class HenkakuServer extends NanoHTTPD {
                     InputStream isb = getExploitBin(session.getParms());
                     response = newChunkedResponse(Response.Status.OK, "octet/stream", isb);
                     break;
+
                 default:
                     if (uri.startsWith("/pkg/")) {
                         InputStream isf = getPackageFile(uri);
 
                         if (isf != null) {
-                            response = newChunkedResponse(Response.Status.OK, "octet/stream", isf);
+
+                            if (patchInstallButton && uri.equals("/pkg/sce_sys/livearea/contents/template.xml")) {
+                                BufferedReader reader = new BufferedReader(new InputStreamReader(isf));
+                                StringBuilder sb = new StringBuilder();
+                                String line;
+                                String target = "<target>http://" + currentIpAddress + ":" + port + "/</target>";
+
+                                while ((line = reader.readLine()) != null) {
+                                    sb.append(line.replace("<target>http://go.henkaku.xyz/</target>", target));
+                                    sb.append('\n');
+                                }
+
+                                reader.close();
+
+                                response = newChunkedResponse(Response.Status.OK, "octet/stream", new ByteArrayInputStream(sb.toString().getBytes(Charset.forName("UTF-8"))));
+                            } else {
+                                response = newChunkedResponse(Response.Status.OK, "octet/stream", isf);
+                            }
                         } else {
                             response = newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found");
                         }
